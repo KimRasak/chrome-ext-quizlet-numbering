@@ -1,0 +1,24 @@
+.dodo-quizlet-index-label {
+  align-items: center;
+  background: #4255ff;
+  border-radius: 999px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
+  color: #fff;
+  display: inline-flex;
+  flex: 0 0 auto;
+  font: 700 12px/1 Arial, sans-serif;
+  justify-content: center;
+  margin-right: 8px;
+  min-width: 26px;
+  padding: 5px 8px;
+  vertical-align: middle;
+}
+
+.dodo-quizlet-indexed-term {
+  align-items: center;
+  display: inline-flex;
+}
+
+.dodo-quizlet-indexed-row {
+  position: relative;
+}
