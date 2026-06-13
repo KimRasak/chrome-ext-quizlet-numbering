@@ -1,0 +1,16 @@
+{
+  "manifest_version": 3,
+  "name": "Quizlet Word Index Labels",
+  "version": "1.0.0",
+  "description": "Adds sequence number labels to words on Quizlet flash-card word lists.",
+  "content_scripts": [
+    {
+      "matches": [
+        "https://quizlet.com/*flash-cards*"
+      ],
+      "js": ["content.js"],
+      "css": ["styles.css"],
+      "run_at": "document_idle"
+    }
+  ]
+}
