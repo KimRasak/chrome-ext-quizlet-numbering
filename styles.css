@@ -3,22 +3,127 @@
   background: #4255ff;
   border-radius: 999px;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
+  box-sizing: border-box;
   color: #fff;
   display: inline-flex;
   flex: 0 0 auto;
   font: 700 12px/1 Arial, sans-serif;
   justify-content: center;
-  margin-right: 8px;
+  margin: 0 8px 0 0;
+  min-height: 22px;
   min-width: 26px;
   padding: 5px 8px;
   vertical-align: middle;
+  white-space: nowrap;
 }
 
 .dodo-quizlet-indexed-term {
   align-items: center;
   display: inline-flex;
+  gap: 0;
+  max-width: 100%;
 }
 
 .dodo-quizlet-indexed-row {
   position: relative;
+}
+
+.dodo-quizlet-highlighted-row {
+  border-radius: 12px;
+  box-shadow: 0 0 0 3px rgba(66, 85, 255, 0.3);
+  transition: box-shadow 0.2s ease;
+}
+
+.dodo-quizlet-control-panel {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(66, 85, 255, 0.12);
+  border-radius: 18px;
+  bottom: 24px;
+  box-shadow: 0 12px 32px rgba(25, 35, 78, 0.18);
+  box-sizing: border-box;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  max-width: min(420px, calc(100vw - 32px));
+  padding: 12px;
+  position: fixed;
+  right: 24px;
+  z-index: 2147483647;
+}
+
+.dodo-quizlet-control-panel--hidden {
+  display: none;
+}
+
+.dodo-quizlet-jump-input {
+  background: #fff;
+  border: 1px solid rgba(66, 85, 255, 0.24);
+  border-radius: 999px;
+  box-sizing: border-box;
+  color: #1f1f3d;
+  flex: 0 1 96px;
+  font: 600 14px/1 Arial, sans-serif;
+  min-width: 76px;
+  outline: none;
+  padding: 12px 14px;
+  width: 96px;
+}
+
+.dodo-quizlet-jump-input:focus {
+  border-color: #4255ff;
+  box-shadow: 0 0 0 3px rgba(66, 85, 255, 0.14);
+}
+
+.dodo-quizlet-jump-input:disabled,
+.dodo-quizlet-jump-button:disabled,
+.dodo-quizlet-export-button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.dodo-quizlet-jump-input::-webkit-inner-spin-button,
+.dodo-quizlet-jump-input::-webkit-outer-spin-button {
+  margin: 0;
+}
+
+.dodo-quizlet-jump-button,
+.dodo-quizlet-export-button {
+  background: #4255ff;
+  border: 0;
+  border-radius: 999px;
+  box-shadow: 0 10px 24px rgba(66, 85, 255, 0.22);
+  box-sizing: border-box;
+  color: #fff;
+  cursor: pointer;
+  flex: 0 0 auto;
+  font: 700 14px/1 Arial, sans-serif;
+  min-height: 42px;
+  padding: 12px 18px;
+  transition: background 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+  white-space: nowrap;
+}
+
+.dodo-quizlet-jump-button:hover,
+.dodo-quizlet-export-button:hover {
+  background: #3346e6;
+  box-shadow: 0 14px 30px rgba(66, 85, 255, 0.3);
+  transform: translateY(-1px);
+}
+
+.dodo-quizlet-jump-button:active,
+.dodo-quizlet-export-button:active {
+  transform: translateY(0);
+}
+
+@media (max-width: 520px) {
+  .dodo-quizlet-control-panel {
+    bottom: 12px;
+    justify-content: flex-end;
+    right: 12px;
+  }
+
+  .dodo-quizlet-jump-input {
+    flex: 1 1 84px;
+  }
 }
