@@ -116,6 +116,49 @@
   transform: translateY(0);
 }
 
+.dodo-quizlet-row--hidden {
+  display: none !important;
+}
+
+.dodo-quizlet-page-nav {
+  align-items: center;
+  display: flex;
+  gap: 6px;
+  width: 100%;
+  justify-content: center;
+}
+
+.dodo-quizlet-page-label {
+  color: #1f1f3d;
+  font: 600 13px/1 Arial, sans-serif;
+  min-width: 48px;
+  text-align: center;
+}
+
+.dodo-quizlet-prev-button,
+.dodo-quizlet-next-button {
+  background: transparent;
+  border: 1px solid rgba(66, 85, 255, 0.3);
+  border-radius: 999px;
+  color: #4255ff;
+  cursor: pointer;
+  font: 700 16px/1 Arial, sans-serif;
+  min-height: 32px;
+  padding: 4px 12px;
+  transition: background 0.15s ease;
+}
+
+.dodo-quizlet-prev-button:hover,
+.dodo-quizlet-next-button:hover {
+  background: rgba(66, 85, 255, 0.08);
+}
+
+.dodo-quizlet-prev-button:disabled,
+.dodo-quizlet-next-button:disabled {
+  cursor: default;
+  opacity: 0.35;
+}
+
 @media (max-width: 520px) {
   .dodo-quizlet-control-panel {
     bottom: 12px;
