@@ -25,12 +25,15 @@
   let jumpFeedbackTimeoutId;
   let highlightTimeoutId;
   let observer;
+  let observerPaused = false;
   let jumpSearchInProgress = false;
   let exportInProgress = false;
   // Map from row element -> assigned 1-based index (persists across scroll)
   const rowIndexMap = new WeakMap();
   let globalRowCounter = 0;
   let currentPage = 1;
+  // Per-scan cache for expensive word-element lookups (reset each row scan).
+  let wordElementCache = new WeakMap();
 
   const wait = (delay) => new Promise((resolve) => {
     window.setTimeout(resolve, delay);
@@ -65,6 +68,16 @@
   };
 
   const getWordElement = (row) => {
+    if (wordElementCache.has(row)) {
+      return wordElementCache.get(row);
+    }
+
+    const result = computeWordElement(row);
+    wordElementCache.set(row, result);
+    return result;
+  };
+
+  const computeWordElement = (row) => {
     const exactMatches = Array.from(row.querySelectorAll(WORD_TEXT_SELECTOR))
       .filter((element) => !element.classList.contains(LABEL_CLASS))
       .filter((element) => isElementVisible(element) || element.textContent.trim());
@@ -124,7 +137,17 @@
 
   const hasExactWordElement = (row) => Boolean(row.querySelector(WORD_TEXT_SELECTOR));
 
-  const isNestedInsideAnotherRow = (row, rows) => rows.some((candidate) => candidate !== row && candidate.contains(row));
+  const isNestedInsideAnotherRow = (row, rowSet) => {
+    // Walk ancestors (O(depth)) instead of scanning every other row (O(n)).
+    let parent = row.parentElement;
+    while (parent) {
+      if (rowSet.has(parent)) {
+        return true;
+      }
+      parent = parent.parentElement;
+    }
+    return false;
+  };
 
   const getStableRows = (selector) => {
     const rows = getUniqueElements(Array.from(document.querySelectorAll(selector)))
@@ -132,7 +155,8 @@
       .filter((row) => !row.closest(`.${CONTROL_PANEL_CLASS}`))
       .filter((row) => isElementVisible(row) || hasWordContent(row));
 
-    return rows.filter((row) => !isNestedInsideAnotherRow(row, rows));
+    const rowSet = new Set(rows);
+    return rows.filter((row) => !isNestedInsideAnotherRow(row, rowSet));
   };
 
   const getTermRows = () => {
@@ -152,7 +176,8 @@
       .filter((element) => /(^|[-_])term([-_]|$)/i.test(element.getAttribute('data-testid') || ''))
       .filter((element) => hasWordContent(element));
 
-    return testIdRows.filter((row) => !isNestedInsideAnotherRow(row, testIdRows));
+    const testIdRowSet = new Set(testIdRows);
+    return testIdRows.filter((row) => !isNestedInsideAnotherRow(row, testIdRowSet));
   };
 
   const getRenderedExportRows = () => getStableRows('.SetPageTermsList-term, [class*="SetPageTermsList-term"]');
@@ -280,11 +305,6 @@
     }
   };
 
-  const isNearViewport = (element) => {
-    const rect = element.getBoundingClientRect();
-    return rect.bottom >= -LABEL_VIEWPORT_BUFFER && rect.top <= window.innerHeight + LABEL_VIEWPORT_BUFFER;
-  };
-
   const addLabels = () => {
     const rows = getTermRows();
     if (rows.length === 0) {
@@ -305,16 +325,28 @@
       updatePaginationButtons();
     }
 
-    // Only label rows near the viewport; remove labels from far-away rows
+    // --- Read phase: gather everything that touches layout up front so we
+    // never interleave reads with writes (avoids layout thrashing/jank). ---
+    const viewportTop = -LABEL_VIEWPORT_BUFFER;
+    const viewportBottom = window.innerHeight + LABEL_VIEWPORT_BUFFER;
+    const plans = [];
+
     rows.forEach((row) => {
       const wordElement = getWordElement(row);
       if (!wordElement || isRowEditable(row)) {
         return;
       }
 
+      const rect = row.getBoundingClientRect();
+      const near = rect.bottom >= viewportTop && rect.top <= viewportBottom;
+      plans.push({ row, wordElement, near, index: rowIndexMap.get(row) });
+    });
+
+    // --- Write phase: mutate the DOM without reading layout again. ---
+    plans.forEach(({ row, wordElement, near, index }) => {
       const existingLabel = wordElement.querySelector(`.${LABEL_CLASS}`);
 
-      if (!isNearViewport(row)) {
+      if (!near) {
         // Outside viewport buffer: remove label to save DOM nodes
         if (existingLabel) {
           existingLabel.remove();
@@ -325,7 +357,6 @@
       }
 
       // Inside viewport buffer: ensure label is present and correct
-      const index = rowIndexMap.get(row);
       if (existingLabel) {
         if (existingLabel.textContent !== String(index)) {
           existingLabel.textContent = String(index);
@@ -615,6 +646,12 @@
         return;
       }
 
+      if (getTotalWordCount() > PAGE_SIZE) {
+        currentPage = Math.ceil(targetIndex / PAGE_SIZE);
+        applyPageVisibility(rows);
+        updatePaginationButtons();
+      }
+
       targetRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
       highlightRow(targetRow);
       setJumpButtonLabel(`Row ${targetIndex}`, 1800);
@@ -731,14 +768,28 @@
     };
   };
 
+  const isUserEditing = () => isEditableElement(document.activeElement);
+
   const refreshUi = () => {
     if (!document.body) {
+      return;
+    }
+
+    // Safety net: if a refresh is somehow scheduled while an edit field is
+    // focused (observer is normally paused on focusin), skip it. Re-scanning
+    // mid-edit is exactly what makes typing feel janky, and labels are hidden
+    // on editable rows anyway.
+    if (isUserEditing()) {
       return;
     }
 
     if (observer) {
       observer.disconnect();
     }
+
+    // Reset the per-scan word-element cache so a fresh DOM (e.g. after
+    // entering/leaving edit mode) is measured once, not repeatedly.
+    wordElementCache = new WeakMap();
 
     runSafely(() => {
       addLabels();
@@ -756,6 +807,34 @@
 
   const scheduleRefreshUi = debounce(refreshUi, 250);
 
+  const pauseObserverForEditing = () => {
+    if (observerPaused) {
+      return;
+    }
+    observerPaused = true;
+    // Fully detach while the user types. A subtree observer on document.body
+    // fires on every keystroke's React re-render; even a cheap callback adds
+    // measurable input latency, so we stop observing entirely until blur.
+    if (observer) {
+      observer.disconnect();
+    }
+  };
+
+  const resumeObserverAfterEditing = () => {
+    if (!observerPaused) {
+      return;
+    }
+    observerPaused = false;
+    if (observer && document.body) {
+      observer.observe(document.body, {
+        childList: true,
+        subtree: true,
+      });
+    }
+    // Editing may have added/removed rows — re-scan once, now that it settled.
+    scheduleRefreshUi();
+  };
+
   const start = () => {
     refreshUi();
 
@@ -771,6 +850,19 @@
       childList: true,
       subtree: true,
     });
+
+    // Pause all observation while an edit field is focused, resume on blur.
+    document.addEventListener('focusin', (event) => {
+      if (isEditableElement(event.target)) {
+        pauseObserverForEditing();
+      }
+    }, true);
+
+    document.addEventListener('focusout', (event) => {
+      if (isEditableElement(event.target)) {
+        resumeObserverAfterEditing();
+      }
+    }, true);
 
     // Re-label on scroll so near-viewport labels stay current
     window.addEventListener('scroll', scheduleRefreshUi, { passive: true });
